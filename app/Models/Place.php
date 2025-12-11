@@ -22,6 +22,12 @@ class Place extends Model
         'google_maps_url'
     ];
 
+    public function getImageUrlAttribute()
+{
+    return $this->image ? asset('storage/' . $this->image) : null;
+}
+
+
     protected $casts = [
         'lat' => 'float',
         'lng' => 'float',
@@ -36,6 +42,12 @@ class Place extends Model
             'lng' => $this->lng
         ];
     }
+    
+    public function parkingSpots()
+{
+    return $this->hasMany(ParkingSpot::class);
+}
+
 
     // دالة لإنشاء رابط خرائط جوجل
     public function getGoogleMapsLinkAttribute()

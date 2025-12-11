@@ -29,19 +29,9 @@ class UpdateRequest extends FormRequest
     }
 
     return [
-        'name' => ['required', 'string', 'max:100', 'min:2'],
-        'email' => [
-            'required',
-            'email',
-            'max:255',
-            Rule::unique('users')->ignore($user->id),
-        ],
-        'phone' => [
-            'nullable',
-            'string',
-            'max:20',
-            Rule::unique('users')->ignore($user->id),
-        ],
+            'name'  => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $this->user()->id,
+            'phone' => 'sometimes|string|max:20',
     ];
 }
 }

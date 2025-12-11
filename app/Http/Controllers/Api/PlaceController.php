@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\Place;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Storage;
 
 class PlaceController extends Controller
 {
@@ -37,7 +38,7 @@ class PlaceController extends Controller
 
             $name = $request->name;
 
-            $place = Place::where('name', 'like', "%{$name}%")
+            $place = Place::with('parkingSpots')->where('name', 'like', "%{$name}%")
                 ->orWhere('street', 'like', "%{$name}%")
                 ->orWhere('city', 'like', "%{$name}%")
                 ->first();
@@ -94,37 +95,44 @@ class PlaceController extends Controller
      * POST /api/places
      */
     public function store(Request $request)
-    {
-        try {
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'street' => 'required|string|max:255',
-                'description' => 'required|string',
-                'price' => 'required|numeric',
-                'lat' => 'required|numeric|between:-90,90',
-                'lng' => 'required|numeric|between:-180,180',
-                'city' => 'nullable|string',
-                'country' => 'nullable|string',
-                'full_address' => 'nullable|string',
-                'google_maps_url' => 'nullable|url'
-            ]);
+{
+    try {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'street' => 'required|string|max:255',
+            'description' => 'required|string',
+            'price' => 'required|numeric',
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
+            'city' => 'nullable|string',
+            'country' => 'nullable|string',
+            'full_address' => 'nullable|string',
+            'google_maps_url' => 'nullable|url',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048'
+        ]);
 
-            $place = Place::create($validated);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'تم إنشاء المكان بنجاح',
-                'data' => $place
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'حدث خطأ أثناء إنشاء المكان',
-                'error' => $e->getMessage()
-            ], 500);
+        // رفع الصورة إن وجدت
+        if ($request->hasFile('image')) {
+            $validated['image'] = $request->file('image')->store('places', 'public');
         }
+
+        $place = Place::create($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إنشاء المكان بنجاح',
+            'data' => $place
+        ], 201);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'حدث خطأ أثناء إنشاء المكان',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
 
     /**
      * دالة مساعدة: توليد HTML لـ InfoWindow
@@ -172,7 +180,7 @@ class PlaceController extends Controller
     public function show($id)
     {
         try {
-            $place = Place::find($id);
+            $place = Place::with('parkingSpots')->find($id);
 
             if (!$place) {
                 return response()->json([
@@ -201,46 +209,59 @@ class PlaceController extends Controller
      * PUT /api/places/{id}
      */
     public function update(Request $request, $id)
-    {
-        try {
-            $place = Place::find($id);
+{
+    try {
+        $place = Place::find($id);
 
-            if (!$place) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'المكان غير موجود'
-                ], 404);
-            }
-
-            $validated = $request->validate([
-                'name' => 'sometimes|string|max:255',
-                'street' => 'sometimes|string|max:255',
-                'description' => 'sometimes|string',
-                'price' => 'sometimes|numeric',
-                'lat' => 'sometimes|numeric|between:-90,90',
-                'lng' => 'sometimes|numeric|between:-180,180',
-                'city' => 'nullable|string',
-                'country' => 'nullable|string',
-                'full_address' => 'nullable|string',
-                'google_maps_url' => 'nullable|url'
-            ]);
-
-            $place->update($validated);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'تم تحديث المكان بنجاح',
-                'data' => $place
-            ], 200);
-
-        } catch (\Exception $e) {
+        if (!$place) {
             return response()->json([
                 'success' => false,
-                'message' => 'حدث خطأ أثناء التحديث',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'المكان غير موجود'
+            ], 404);
         }
+
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'street' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'price' => 'sometimes|numeric',
+            'lat' => 'sometimes|numeric|between:-90,90',
+            'lng' => 'sometimes|numeric|between:-180,180',
+            'city' => 'nullable|string',
+            'country' => 'nullable|string',
+            'full_address' => 'nullable|string',
+            'google_maps_url' => 'nullable|url',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048'
+        ]);
+
+        // رفع الصورة الجديدة إن وجدت
+        if ($request->hasFile('image')) {
+            // حذف الصورة القديمة
+            if ($place->image && Storage::disk('public')->exists($place->image)) {
+                Storage::disk('public')->delete($place->image);
+            }
+
+            $validated['image'] = $request->file('image')->store('places', 'public');
+        }
+
+        $place->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تحديث المكان بنجاح',
+            'data' => $place
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'حدث خطأ أثناء التحديث',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
+
 
     /**
      * حذف مكان
