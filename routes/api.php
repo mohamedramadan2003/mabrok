@@ -28,7 +28,7 @@ Route::prefix('places')->group(function () {
 });
 Route::prefix('places/{place}')->group(function () {
 
-    // إنشاء ركن جديد
+    // إنشاء ركن جديد   
     Route::post('/parking', [ParkingController::class, 'store']);
 
     // عرض كل الركنات
